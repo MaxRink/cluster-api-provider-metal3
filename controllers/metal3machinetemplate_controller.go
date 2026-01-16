@@ -56,16 +56,26 @@ type Metal3MachineTemplateReconciler struct {
 func (r *Metal3MachineTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, rerr error) {
 	m3templateLog := r.Log.WithName(templateControllerName).WithValues("metal3-machine-template", req.NamespacedName)
 
+	m3templateLog.V(baremetal.VerbosityLevelTrace).Info("starting reconciliation",
+		baremetal.LogFieldController, templateControllerName,
+		baremetal.LogFieldNamespace, req.Namespace,
+		baremetal.LogFieldName, req.Name,
+	)
+
 	// Fetch the Metal3MachineTemplate instance.
 	metal3MachineTemplate := &infrav1.Metal3MachineTemplate{}
 
 	if err := r.Client.Get(ctx, req.NamespacedName, metal3MachineTemplate); err != nil {
 		if apierrors.IsNotFound(err) {
+			m3templateLog.V(baremetal.VerbosityLevelTrace).Info("Metal3MachineTemplate not found, skipping")
 			return ctrl.Result{}, nil
 		}
-
 		return ctrl.Result{}, fmt.Errorf("unable to fetch Metal3MachineTemplate: %w", err)
 	}
+
+	m3templateLog.V(baremetal.VerbosityLevelDebug).Info("fetched Metal3MachineTemplate",
+		baremetal.LogFieldName, metal3MachineTemplate.Name,
+	)
 
 	helper, err := v1beta1patch.NewHelper(metal3MachineTemplate, r.Client)
 	if err != nil {
@@ -88,6 +98,10 @@ func (r *Metal3MachineTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, fmt.Errorf("unable to fetch Metal3MachineList: %w", err)
 	}
 
+	m3templateLog.V(baremetal.VerbosityLevelDebug).Info("fetched Metal3MachineList",
+		"count", len(m3machinelist.Items),
+	)
+
 	// Create a helper for managing a Metal3MachineTemplate.
 	templateMgr, err := r.ManagerFactory.NewMachineTemplateManager(metal3MachineTemplate, m3machinelist, m3templateLog)
 	if err != nil {
@@ -96,23 +110,29 @@ func (r *Metal3MachineTemplateReconciler) Reconcile(ctx context.Context, req ctr
 
 	// Return early if the Metal3MachineTemplate is paused.
 	if annotations.HasPaused(metal3MachineTemplate) {
-		m3templateLog.Info("Metal3MachineTemplate is currently paused. Remove pause annotation to continue reconciliation.")
+		m3templateLog.V(baremetal.VerbosityLevelDebug).Info("Metal3MachineTemplate is paused, requeueing")
 		return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 	}
 
+	m3templateLog.V(baremetal.VerbosityLevelTrace).Info("proceeding to reconcileNormal")
+
 	// Handle non-deleted machines
-	return r.reconcileNormal(ctx, templateMgr)
+	return r.reconcileNormal(ctx, templateMgr, m3templateLog)
 }
 
 func (r *Metal3MachineTemplateReconciler) reconcileNormal(ctx context.Context,
 	templateMgr baremetal.TemplateManagerInterface,
+	log logr.Logger,
 ) (ctrl.Result, error) { //nolint:unparam
+	log.V(baremetal.VerbosityLevelTrace).Info("entering reconcileNormal")
+
 	// Find the Metal3Machines with clonedFromName annotation referencing
 	// to the same Metal3MachineTemplate
 	if err := templateMgr.UpdateAutomatedCleaningMode(ctx); err != nil {
-		r.Log.Error(err, "failed to list Metal3Machines with clonedFromName annotation")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to update automated cleaning mode: %w", err)
 	}
+
+	log.V(baremetal.VerbosityLevelTrace).Info("reconcileNormal completed successfully")
 
 	return ctrl.Result{}, nil
 }

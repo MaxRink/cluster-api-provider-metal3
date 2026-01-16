@@ -160,7 +160,9 @@ func (r *RemediationManager) SetPowerOffAnnotation(ctx context.Context) error {
 		return errors.New("unable to set a PowerOff Annotation, Host not found")
 	}
 
-	r.Log.Info("Adding PowerOff annotation to host", "host", host.Name)
+	r.Log.Info("Adding PowerOff annotation to BareMetalHost",
+		LogFieldHost, host.Name,
+		LogFieldNamespace, host.Namespace)
 	rebootMode := bmov1alpha1.RebootAnnotationArguments{}
 	rebootMode.Mode = bmov1alpha1.RebootModeHard
 	marshalledMode, err := json.Marshal(rebootMode)
@@ -186,7 +188,9 @@ func (r *RemediationManager) RemovePowerOffAnnotation(ctx context.Context) error
 		return errors.New("unable to remove PowerOff Annotation, Host not found")
 	}
 
-	r.Log.Info("Removing PowerOff annotation from host", "host name", host.Name)
+	r.Log.Info("Removing PowerOff annotation from BareMetalHost",
+		LogFieldHost, host.Name,
+		LogFieldNamespace, host.Namespace)
 	delete(host.Annotations, r.getPowerOffAnnotationKey())
 	return helper.Patch(ctx, host)
 }
@@ -230,7 +234,9 @@ func (r *RemediationManager) SetUnhealthyAnnotation(ctx context.Context) error {
 		return errors.New("unable to set an Unhealthy Annotation, Host not found")
 	}
 
-	r.Log.Info("Adding Unhealthy annotation to host", "host", host.Name)
+	r.Log.Info("Adding Unhealthy annotation to BareMetalHost",
+		LogFieldHost, host.Name,
+		LogFieldNamespace, host.Namespace)
 	if host.Annotations == nil {
 		host.Annotations = make(map[string]string, 1)
 	}
@@ -275,7 +281,9 @@ func getUnhealthyHost(ctx context.Context, m3Machine *infrav1.Metal3Machine, cl 
 	}
 	err = cl.Get(ctx, key, &host)
 	if apierrors.IsNotFound(err) {
-		rLog.Info("Annotated host not found", "host", hostKey)
+		rLog.Info("Annotated BareMetalHost not found",
+			LogFieldHost, hostName,
+			LogFieldNamespace, hostNamespace)
 		return nil, err
 	} else if err != nil {
 		return nil, err
@@ -314,7 +322,10 @@ func (r *RemediationManager) HasReachRetryLimit() bool {
 
 // SetRemediationPhase setting the state of the remediation.
 func (r *RemediationManager) SetRemediationPhase(phase string) {
-	r.Log.Info("Switching remediation phase", "remediationPhase", phase)
+	r.Log.Info("Switching remediation phase",
+		LogFieldRemediation, r.Metal3Remediation.Name,
+		LogFieldNamespace, r.Metal3Remediation.Namespace,
+		"remediationPhase", phase)
 	r.Metal3Remediation.Status.Phase = phase
 }
 
@@ -330,7 +341,10 @@ func (r *RemediationManager) GetLastRemediatedTime() *metav1.Time {
 
 // SetLastRemediationTime setting last remediation timestamp on Status.
 func (r *RemediationManager) SetLastRemediationTime(remediationTime *metav1.Time) {
-	r.Log.Info("Last remediation time", "remediationTime", remediationTime)
+	r.Log.V(VerbosityLevelDebug).Info("Setting last remediation time",
+		LogFieldRemediation, r.Metal3Remediation.Name,
+		LogFieldNamespace, r.Metal3Remediation.Namespace,
+		"remediationTime", remediationTime)
 	r.Metal3Remediation.Status.LastRemediated = remediationTime
 }
 
@@ -349,13 +363,19 @@ func (r *RemediationManager) IncreaseRetryCount() {
 func (r *RemediationManager) SetOwnerRemediatedConditionNew(ctx context.Context) error {
 	capiMachine, err := r.GetCapiMachine(ctx)
 	if err != nil {
-		r.Log.Info("Unable to fetch CAPI Machine")
+		r.Log.Info("Unable to fetch CAPI Machine",
+			LogFieldRemediation, r.Metal3Remediation.Name,
+			LogFieldNamespace, r.Metal3Remediation.Namespace,
+			LogFieldError, err.Error())
 		return err
 	}
 
 	machineHelper, err := v1beta1patch.NewHelper(capiMachine, r.Client)
 	if err != nil {
-		r.Log.Info("Unable to create patch helper for Machine")
+		r.Log.Info("Unable to create patch helper for Machine",
+			LogFieldMachine, capiMachine.Name,
+			LogFieldNamespace, capiMachine.Namespace,
+			LogFieldError, err.Error())
 		return err
 	}
 
@@ -366,7 +386,10 @@ func (r *RemediationManager) SetOwnerRemediatedConditionNew(ctx context.Context)
 		"")
 	err = machineHelper.Patch(ctx, capiMachine)
 	if err != nil {
-		r.Log.Info("Unable to patch Machine", "machine", capiMachine)
+		r.Log.Info("Unable to patch Machine",
+			LogFieldMachine, capiMachine.Name,
+			LogFieldNamespace, capiMachine.Namespace,
+			LogFieldError, err.Error())
 		return err
 	}
 	return nil

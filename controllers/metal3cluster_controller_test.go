@@ -22,6 +22,7 @@ import (
 	baremetal_mocks "github.com/metal3-io/cluster-api-provider-metal3/baremetal/mocks"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ = Describe("Metal3Cluster controller", func() {
@@ -73,7 +74,7 @@ var _ = Describe("Metal3Cluster controller", func() {
 			m.EXPECT().
 				Create(context.TODO()).Return(returnedError)
 
-			res, err := reconcileNormal(context.TODO(), m)
+			res, err := reconcileClusterNormal(context.TODO(), m, ctrl.Log.WithName("test"))
 
 			if tc.ExpectError {
 				Expect(err).To(HaveOccurred())
@@ -139,7 +140,7 @@ var _ = Describe("Metal3Cluster controller", func() {
 				returnedError,
 			)
 
-			res, err := reconcileDelete(context.TODO(), m)
+			res, err := reconcileClusterDelete(context.TODO(), m, ctrl.Log.WithName("test"))
 
 			if tc.ExpectError {
 				Expect(err).To(HaveOccurred())

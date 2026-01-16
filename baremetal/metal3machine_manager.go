@@ -186,14 +186,20 @@ func (m *MachineManager) IsProvisioned() bool {
 
 // IsBaremetalHostProvisioned returns true if the provisioning state of the underlying baremetalhost is `Provisioned`.
 func (m *MachineManager) IsBaremetalHostProvisioned(ctx context.Context) bool {
-	m.Log.Info("checking if baremetalhost is provisioned")
+	m.Log.V(VerbosityLevelDebug).Info("Checking if BareMetalHost is provisioned",
+		LogFieldMetal3Machine, m.Metal3Machine.Name,
+		LogFieldNamespace, m.Metal3Machine.Namespace)
 	host, _, err := m.getHost(ctx)
 	if err != nil {
-		m.Log.Info("failed to get host", "err", err)
+		m.Log.V(VerbosityLevelDebug).Info("Failed to get BareMetalHost",
+			LogFieldMetal3Machine, m.Metal3Machine.Name,
+			LogFieldError, err.Error())
 		return false
 	}
 	if host == nil {
-		m.Log.Info("getHost returned nil")
+		m.Log.V(VerbosityLevelDebug).Info("BareMetalHost not found for Metal3Machine",
+			LogFieldMetal3Machine, m.Metal3Machine.Name,
+			LogFieldNamespace, m.Metal3Machine.Namespace)
 		return false
 	}
 	return host.Status.Provisioning.State == bmov1alpha1.StateProvisioned
@@ -234,9 +240,11 @@ func (m *MachineManager) RemovePauseAnnotation(ctx context.Context) error {
 	// look for associated BMH
 	host, helper, err := m.getHost(ctx)
 	if err != nil {
-		errMessage := "failed to get a BaremetalHost for the Metal3Machine, requeuing"
-		m.Log.Info(errMessage)
-		return WithTransientError(errors.New(errMessage), requeueAfter)
+		m.Log.Info("Failed to get BareMetalHost for Metal3Machine, requeuing",
+			LogFieldMetal3Machine, m.Metal3Machine.Name,
+			LogFieldNamespace, m.Metal3Machine.Namespace,
+			LogFieldError, err.Error())
+		return WithTransientError(errors.New("failed to get a BareMetalHost for the Metal3Machine, requeuing"), requeueAfter)
 	}
 
 	if host == nil {
@@ -251,7 +259,10 @@ func (m *MachineManager) RemovePauseAnnotation(ctx context.Context) error {
 				// Removing BMH Paused Annotation Since Owner Cluster is not paused.
 				delete(host.Annotations, bmov1alpha1.PausedAnnotation)
 			} else if m.Cluster.Name == host.Labels[clusterv1.ClusterNameLabel] && annotations[bmov1alpha1.PausedAnnotation] != PausedAnnotationKey {
-				m.Log.Info("BMH is paused by user. Not removing Pause Annotation")
+				m.Log.Info("BareMetalHost is paused by user, not removing pause annotation",
+					LogFieldHost, host.Name,
+					LogFieldNamespace, host.Namespace,
+					LogFieldCluster, m.Cluster.Name)
 				return nil
 			}
 		}
@@ -264,9 +275,11 @@ func (m *MachineManager) SetPauseAnnotation(ctx context.Context) error {
 	// look for associated BMH
 	host, helper, err := m.getHost(ctx)
 	if err != nil {
-		errMessage := fmt.Sprintf("Failed to get the BaremetalHost associated with Metal3Machine %s, requeuing", m.Metal3Machine.Name)
-		m.Log.Info(errMessage)
-		return WithTransientError(errors.New(errMessage), requeueAfter)
+		m.Log.Info("Failed to get BareMetalHost for Metal3Machine, requeuing",
+			LogFieldMetal3Machine, m.Metal3Machine.Name,
+			LogFieldNamespace, m.Metal3Machine.Namespace,
+			LogFieldError, err.Error())
+		return WithTransientError(fmt.Errorf("failed to get the BareMetalHost associated with Metal3Machine %s, requeuing", m.Metal3Machine.Name), requeueAfter)
 	}
 	if host == nil {
 		return nil
@@ -276,13 +289,17 @@ func (m *MachineManager) SetPauseAnnotation(ctx context.Context) error {
 
 	if annotations != nil {
 		if _, ok := annotations[bmov1alpha1.PausedAnnotation]; ok {
-			m.Log.Info("BaremetalHost is already paused")
+			m.Log.V(VerbosityLevelDebug).Info("BareMetalHost is already paused",
+				LogFieldHost, host.Name,
+				LogFieldNamespace, host.Namespace)
 			return nil
 		}
 	} else {
 		host.Annotations = make(map[string]string)
 	}
-	m.Log.Info("Adding PausedAnnotation in BareMetalHost")
+	m.Log.Info("Adding pause annotation to BareMetalHost",
+		LogFieldHost, host.Name,
+		LogFieldNamespace, host.Namespace)
 	host.Annotations[bmov1alpha1.PausedAnnotation] = PausedAnnotationKey
 
 	// Setting annotation with BMH status
@@ -315,7 +332,10 @@ func (m *MachineManager) Associate(ctx context.Context) error {
 	// could be selected for multiple M3Ms. Therefore we use a mutex lock here.
 	associateBMHMutex.Lock()
 	defer associateBMHMutex.Unlock()
-	m.Log.Info("Associating machine", "machine", m.Machine.Name)
+	m.Log.Info("Associating Metal3Machine with BareMetalHost",
+		LogFieldMachine, m.Machine.Name,
+		LogFieldMetal3Machine, m.Metal3Machine.Name,
+		LogFieldNamespace, m.Metal3Machine.Namespace)
 
 	// load and validate the config
 	if m.Metal3Machine == nil {
@@ -336,13 +356,20 @@ func (m *MachineManager) Associate(ctx context.Context) error {
 			return err
 		}
 		if host == nil {
-			errMessage := "no available host found. Requeuing"
-			m.Log.Info(errMessage)
-			return WithTransientError(errors.New(errMessage), requeueAfter)
+			m.Log.Info("No available BareMetalHost found for Metal3Machine, requeuing",
+				LogFieldMetal3Machine, m.Metal3Machine.Name,
+				LogFieldNamespace, m.Metal3Machine.Namespace)
+			return WithTransientError(errors.New("no available host found, requeuing"), requeueAfter)
 		}
-		m.Log.Info("Associating machine with host", "host", host.Name)
+		m.Log.Info("Associating Metal3Machine with selected BareMetalHost",
+			LogFieldMetal3Machine, m.Metal3Machine.Name,
+			LogFieldHost, host.Name,
+			LogFieldNamespace, host.Namespace)
 	} else {
-		m.Log.Info("Machine already associated with host", "host", host.Name)
+		m.Log.V(VerbosityLevelDebug).Info("Metal3Machine already associated with BareMetalHost",
+			LogFieldMetal3Machine, m.Metal3Machine.Name,
+			LogFieldHost, host.Name,
+			LogFieldNamespace, host.Namespace)
 	}
 
 	// A machine bootstrap not ready case is caught in the controller

@@ -60,7 +60,8 @@ func NewMachineTemplateManager(client client.Client,
 // UpdateAutomatedCleaningMode synchronizes automatedCleaningMode field value between metal3MachineTemplate
 // and all the metal3Machines cloned from this metal3MachineTemplate.
 func (m *MachineTemplateManager) UpdateAutomatedCleaningMode(ctx context.Context) error {
-	m.Log.Info("Fetching metal3Machine objects")
+	m.Log.V(VerbosityLevelTrace).Info("Synchronizing automatedCleaningMode")
+	m.Log.V(VerbosityLevelDebug).Info("Fetching metal3Machine objects")
 
 	// get list of metal3Machine objects
 	m3ms := &infrav1.Metal3MachineList{}

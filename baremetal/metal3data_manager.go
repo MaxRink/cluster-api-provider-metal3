@@ -87,6 +87,7 @@ func NewDataManager(client client.Client,
 func (m *DataManager) SetFinalizer() {
 	// If the Metal3Data doesn't have finalizer, add it.
 	if !controllerutil.ContainsFinalizer(m.Data, infrav1.DataFinalizer) {
+		m.Log.V(VerbosityLevelTrace).Info("Adding finalizer to Metal3Data")
 		controllerutil.AddFinalizer(m.Data, infrav1.DataFinalizer)
 	}
 }
@@ -94,6 +95,7 @@ func (m *DataManager) SetFinalizer() {
 // UnsetFinalizer unsets finalizer.
 func (m *DataManager) UnsetFinalizer() {
 	// Remove the finalizer.
+	m.Log.V(VerbosityLevelTrace).Info("Removing finalizer from Metal3Data")
 	controllerutil.RemoveFinalizer(m.Data, infrav1.DataFinalizer)
 }
 
@@ -109,17 +111,23 @@ func (m *DataManager) setError(_ context.Context, msg string) {
 
 // Reconcile handles Metal3Data events.
 func (m *DataManager) Reconcile(ctx context.Context) error {
+	m.Log.V(VerbosityLevelTrace).Info("Starting Metal3Data reconciliation")
 	m.clearError(ctx)
 
 	if err := m.createSecrets(ctx); err != nil {
 		var reconcileError ReconcileError
 		if errors.As(err, &reconcileError) && reconcileError.IsTransient() {
+			m.Log.V(VerbosityLevelDebug).Info("Transient error during secret creation, will retry",
+				LogFieldError, err.Error())
 			return err
 		}
+		m.Log.V(VerbosityLevelDebug).Info("Error during secret creation",
+			LogFieldError, RootCause(err).Error())
 		m.setError(ctx, RootCause(err).Error())
 		return err
 	}
 
+	m.Log.V(VerbosityLevelTrace).Info("Metal3Data reconciliation completed")
 	return nil
 }
 

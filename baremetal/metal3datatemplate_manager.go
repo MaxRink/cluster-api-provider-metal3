@@ -46,12 +46,6 @@ type DataTemplateManagerInterface interface {
 	UpdateDatas(context.Context) (bool, bool, error)
 }
 
-// Klogr log levels.
-const (
-	EXTRAINFO = 3
-	TRACE     = 5
-)
-
 // DataTemplateManager is responsible for performing machine reconciliation.
 type DataTemplateManager struct {
 	client       client.Client
@@ -73,6 +67,7 @@ func NewDataTemplateManager(client client.Client,
 func (m *DataTemplateManager) SetFinalizer() {
 	// If the Metal3Machine doesn't have finalizer, add it.
 	if !controllerutil.ContainsFinalizer(m.DataTemplate, infrav1.DataTemplateFinalizer) {
+		m.Log.V(VerbosityLevelTrace).Info("Adding finalizer to Metal3DataTemplate")
 		controllerutil.AddFinalizer(m.DataTemplate, infrav1.DataTemplateFinalizer)
 	}
 }
@@ -80,6 +75,7 @@ func (m *DataTemplateManager) SetFinalizer() {
 // UnsetFinalizer unsets finalizer.
 func (m *DataTemplateManager) UnsetFinalizer() {
 	// Remove the finalizer.
+	m.Log.V(VerbosityLevelTrace).Info("Removing finalizer from Metal3DataTemplate")
 	controllerutil.RemoveFinalizer(m.DataTemplate, infrav1.DataTemplateFinalizer)
 }
 
@@ -185,12 +181,12 @@ func (m *DataTemplateManager) UpdateDatas(ctx context.Context) (bool, bool, erro
 				continue
 			}
 		}
-		m.Log.V(TRACE).Info("Initiate updating data of claim", "Metal3DataClaim", dataClaim.Name, "Metal3DataTemplate", m.DataTemplate.Name)
+		m.Log.V(VerbosityLevelTrace).Info("Initiate updating data of claim", "Metal3DataClaim", dataClaim.Name, "Metal3DataTemplate", m.DataTemplate.Name)
 		indexes, err = m.updateData(ctx, &dataClaim, indexes)
 		if err != nil {
 			return false, false, err
 		}
-		m.Log.V(EXTRAINFO).Info("Success updating data of claim", "Metal3DataClaim", dataClaim.Name, "Metal3DataTemplate", m.DataTemplate.Name)
+		m.Log.V(VerbosityLevelDebug).Info("Success updating data of claim", "Metal3DataClaim", dataClaim.Name, "Metal3DataTemplate", m.DataTemplate.Name)
 	}
 	m.updateStatusTimestamp()
 	return hasData, hasClaims, nil
@@ -219,7 +215,7 @@ func (m *DataTemplateManager) updateData(ctx context.Context,
 			return indexes, err
 		}
 	} else {
-		m.Log.V(TRACE).Info("Attempting to delete data of claim and related data if present", "Metal3DataClaim", dataClaim.Name)
+		m.Log.V(VerbosityLevelTrace).Info("Attempting to delete data of claim and related data if present", "Metal3DataClaim", dataClaim.Name)
 		indexes, err = m.deleteMetal3DataAndClaim(ctx, dataClaim, indexes)
 		if err != nil {
 			return indexes, err
@@ -360,7 +356,7 @@ func (m *DataTemplateManager) handleRetrieveDataError(err error, filter string, 
 		m.Log.Error(err, persistentErrMsg, "Metal3DataClaim", dataClaimName, "Metal3DataTemplate", m.DataTemplate.Name, "Metal3Data", dataName)
 		return false, persistentErrMsg
 	} else if err == nil {
-		m.Log.V(TRACE).Info("Metal3Data found!", "Metal3DataClaim", dataClaimName, "Metal3DataTemplate", m.DataTemplate.Name, "Metal3Data", dataName)
+		m.Log.V(VerbosityLevelTrace).Info("Metal3Data found!", "Metal3DataClaim", dataClaimName, "Metal3DataTemplate", m.DataTemplate.Name, "Metal3Data", dataName)
 		return true, ""
 	}
 	return false, ""
@@ -398,7 +394,7 @@ func (m *DataTemplateManager) deleteMetal3DataAndClaim(ctx context.Context,
 	}
 
 	if !m3DataFound {
-		m.Log.V(TRACE).Info("Attempting to retrieve Metal3Data based on Metal3DataClaim render information")
+		m.Log.V(VerbosityLevelTrace).Info("Attempting to retrieve Metal3Data based on Metal3DataClaim render information")
 		if dataClaim != nil && dataClaim.Status.RenderedData != nil {
 			dataName = dataClaim.Status.RenderedData.Name
 			err := m.retrieveData(ctx, dataName, tmpM3Data)
@@ -410,7 +406,7 @@ func (m *DataTemplateManager) deleteMetal3DataAndClaim(ctx context.Context,
 
 	if m3DataFound {
 		// Remove the finalizer
-		m.Log.V(TRACE).Info("Attempting to remove finalizer from associated Metal3Data", "Metal3DataClaim", dataClaim.Name, "Metal3DataTemplate", m.DataTemplate.Name, "Metal3Data", dataName)
+		m.Log.V(VerbosityLevelTrace).Info("Attempting to remove finalizer from associated Metal3Data", "Metal3DataClaim", dataClaim.Name, "Metal3DataTemplate", m.DataTemplate.Name, "Metal3Data", dataName)
 		controllerutil.RemoveFinalizer(tmpM3Data, infrav1.DataClaimFinalizer)
 		err := updateObject(ctx, m.client, tmpM3Data)
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -418,7 +414,7 @@ func (m *DataTemplateManager) deleteMetal3DataAndClaim(ctx context.Context,
 			return indexes, err
 		}
 		// Delete the Metal3Data
-		m.Log.V(EXTRAINFO).Info("Deleting associated Metal3Data", "Metal3DataClaim", dataClaim.Name, "Metal3DataTemplate", m.DataTemplate.Name, "Metal3Data", dataName)
+		m.Log.V(VerbosityLevelDebug).Info("Deleting associated Metal3Data", "Metal3DataClaim", dataClaim.Name, "Metal3DataTemplate", m.DataTemplate.Name, "Metal3Data", dataName)
 		err = deleteObject(ctx, m.client, tmpM3Data)
 		if err != nil && !apierrors.IsNotFound(err) {
 			dataClaim.Status.ErrorMessage = ptr.To("Failed to delete associated Metal3Data object")

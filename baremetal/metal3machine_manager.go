@@ -359,7 +359,7 @@ func (m *MachineManager) Associate(ctx context.Context) error {
 			m.Log.Info("No available BareMetalHost found for Metal3Machine, requeuing",
 				LogFieldMetal3Machine, m.Metal3Machine.Name,
 				LogFieldNamespace, m.Metal3Machine.Namespace)
-			return WithTransientError(errors.New("no available host found, requeuing"), requeueAfter)
+			return WithTransientError(errors.New("no available host found. Requeuing"), requeueAfter)
 		}
 		m.Log.Info("Associating Metal3Machine with selected BareMetalHost",
 			LogFieldMetal3Machine, m.Metal3Machine.Name,

@@ -212,7 +212,6 @@ func (r *Metal3RemediationReconciler) reconcileNormal(ctx context.Context,
 		node, err := remediationMgr.GetNode(ctx, clusterClient)
 		if err != nil {
 			if apierrors.IsForbidden(err) {
-				log.V(baremetal.VerbosityLevelDebug).Info("Node access is forbidden, will skip node deletion")
 				log.Info("Node access is forbidden, will skip node deletion")
 				isNodeForbidden = true
 			} else if !apierrors.IsNotFound(err) {
@@ -243,7 +242,6 @@ func (r *Metal3RemediationReconciler) reconcileNormal(ctx context.Context,
 				return ctrl.Result{}, fmt.Errorf("error getting poweroff annotation status: %w", err)
 			} else if ok {
 				log.Info("Powering on the host")
-				log.V(baremetal.VerbosityLevelTrace).Info("Removing power off annotation")
 				err = remediationMgr.RemovePowerOffAnnotation(ctx)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("error removing poweroff annotation: %w", err)
@@ -282,9 +280,7 @@ func (r *Metal3RemediationReconciler) reconcileNormal(ctx context.Context,
 						}
 					} else {
 						// Node was recreated, restore annotations and labels
-						log.V(baremetal.VerbosityLevelTrace).Info("Restoring node annotations and labels",
-							"nodeName", node.Name)
-						log.Info("Restoring the node")
+						log.Info("Restoring node annotations and labels", "nodeName", node.Name)
 						if err = r.restoreNode(ctx, remediationMgr, clusterClient, node, log); err != nil {
 							return ctrl.Result{}, err
 						}
@@ -292,7 +288,7 @@ func (r *Metal3RemediationReconciler) reconcileNormal(ctx context.Context,
 					}
 
 					// clean up
-					log.V(baremetal.VerbosityLevelTrace).Info("Cleaning up remediation CR")
+
 					log.Info("Remediation done, cleaning up remediation CR")
 					if !r.IsOutOfServiceTaintEnabled {
 						log.V(baremetal.VerbosityLevelDebug).Info("Removing node backup annotations")
@@ -322,7 +318,6 @@ func (r *Metal3RemediationReconciler) reconcileNormal(ctx context.Context,
 
 			if !timedOut {
 				// Not yet time to retry or stop remediation, requeue
-				log.V(baremetal.VerbosityLevelDebug).Info("Not yet timed out, waiting for node health")
 				log.Info("Waiting for node to get healthy and CR being deleted")
 				return ctrl.Result{RequeueAfter: defaultTimeout}, nil
 			}
@@ -410,7 +405,6 @@ func (r *Metal3RemediationReconciler) remediateRebootStrategy(ctx context.Contex
 	if ok, err := remediationMgr.IsPowerOffRequested(ctx); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error getting poweroff annotation status: %w", err)
 	} else if !ok {
-		log.V(baremetal.VerbosityLevelDebug).Info("Power off not yet requested, setting annotation")
 		log.Info("Powering off the host")
 		err = remediationMgr.SetPowerOffAnnotation(ctx)
 		if err != nil {
@@ -470,14 +464,11 @@ func (r *Metal3RemediationReconciler) remediateRebootStrategy(ctx context.Contex
 			*/
 			modified := r.backupNode(remediationMgr, node, log)
 			if modified {
-				log.V(baremetal.VerbosityLevelDebug).Info("Node backup created, requeuing")
-				log.Info("Backing up node")
+				log.Info("Backing up node before deletion", "nodeName", node.Name)
 				// save annotations before deleting node
 				return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 			}
-			log.V(baremetal.VerbosityLevelTrace).Info("Deleting node",
-				"nodeName", node.Name)
-			log.Info("Deleting node")
+			log.Info("Deleting node", "nodeName", node.Name)
 			err := remediationMgr.DeleteNode(ctx, clusterClient, node)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("error deleting node: %w", err)

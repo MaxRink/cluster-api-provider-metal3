@@ -101,7 +101,6 @@ func (r *Metal3LabelSyncReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if host.Annotations != nil {
 		if _, ok := host.Annotations[bmov1alpha1.PausedAnnotation]; ok {
-			controllerLog.V(baremetal.VerbosityLevelDebug).Info("BareMetalHost is paused")
 			controllerLog.Info("BaremetalHost is currently paused. Remove pause to continue reconciliation.")
 			return ctrl.Result{RequeueAfter: bmhSyncInterval}, nil
 		}
@@ -142,12 +141,10 @@ func (r *Metal3LabelSyncReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	if err = r.Client.Get(ctx, capm3MachineKey, capm3Machine); err != nil {
 		if apierrors.IsNotFound(err) {
-			controllerLog.V(baremetal.VerbosityLevelDebug).Info("Metal3Machine not found, will retry",
-				baremetal.LogFieldMetal3Machine, capm3MachineKey)
 			controllerLog.Info("Could not find associated Metal3Machine for BareMetalHost, will retry",
-				"machinekey", capm3MachineKey,
-				"hostnamespace", host.Namespace,
-				"host", host.Name)
+				baremetal.LogFieldMetal3Machine, capm3MachineKey,
+				baremetal.LogFieldHostNamespace, host.Namespace,
+				baremetal.LogFieldHost, host.Name)
 			return ctrl.Result{RequeueAfter: requeueAfter}, nil
 		}
 		return ctrl.Result{}, err
@@ -162,7 +159,6 @@ func (r *Metal3LabelSyncReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("metal3Machine's owner Machine could not be retrieved: %w", err)
 	}
 	if capiMachine == nil {
-		controllerLog.V(baremetal.VerbosityLevelDebug).Info("Machine not found, will retry")
 		controllerLog.Info("Could not find Machine object, will retry")
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
@@ -170,7 +166,6 @@ func (r *Metal3LabelSyncReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	controllerLog.V(baremetal.VerbosityLevelTrace).Info("Found Machine")
 
 	if !capiMachine.Status.NodeRef.IsDefined() {
-		controllerLog.V(baremetal.VerbosityLevelDebug).Info("NodeRef not set, will retry")
 		controllerLog.Info("Could not find Node Ref on Machine object, will retry")
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
@@ -227,7 +222,6 @@ func (r *Metal3LabelSyncReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	prefixStr, ok := annotations[PrefixAnnotationKey]
 	if !ok {
 		controllerLog.V(baremetal.VerbosityLevelDebug).Info("No prefix annotation found on Metal3Cluster")
-		controllerLog.V(baremetal.VerbosityLevelTrace).Info("No annotation for prefixes found on Metal3Cluster")
 		return ctrl.Result{}, nil
 	}
 	controllerLog.V(baremetal.VerbosityLevelDebug).Info("Found prefix annotation",
@@ -251,7 +245,6 @@ func (r *Metal3LabelSyncReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		controllerLog.Info(fmt.Sprintf("Error reconciling BMH labels to Node, will retry: %v", err))
 		return ctrl.Result{RequeueAfter: requeueAfter}, err
 	}
-	controllerLog.V(baremetal.VerbosityLevelDebug).Info("Label synchronization completed")
 	controllerLog.Info("Finished synchronizing labels between BaremetalHost and Node")
 	controllerLog.V(baremetal.VerbosityLevelTrace).Info("Reconcile: completed successfully")
 	// Always requeue to ensure label sync runs periodically for each BareMetalHost. This is necessary to catch any label updates to the Node that are synchronized through the BareMetalHost.

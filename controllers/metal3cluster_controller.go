@@ -128,7 +128,10 @@ func (r *Metal3ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		clusterLog.V(baremetal.VerbosityLevelTrace).Info("Patching Metal3Cluster on exit")
 		if err = patchMetal3Cluster(ctx, patchHelper, metal3Cluster); err != nil {
 			clusterLog.Error(err, "failed to Patch metal3Cluster")
-			rerr = err
+			// Only overwrite rerr if there was no original error
+			if rerr == nil {
+				rerr = err
+			}
 		}
 	}()
 

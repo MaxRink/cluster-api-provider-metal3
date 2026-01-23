@@ -97,6 +97,7 @@ func (r *Metal3DataReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err = r.Client.Get(ctx, req.NamespacedName, &currentObj); err != nil {
 			if apierrors.IsNotFound(err) {
 				metadataLog.Info("Metal3Data no longer exists, skipping patch")
+				// Preserve original error if one exists, don't overwrite with nil
 				return
 			}
 			metadataLog.Info("Failed to check if Metal3Data exists, attempting patch")
@@ -104,7 +105,10 @@ func (r *Metal3DataReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		err = helper.Patch(ctx, metal3Data)
 		if err != nil {
 			metadataLog.Info("failed to Patch Metal3Data")
-			rerr = err
+			// Only overwrite rerr if there was no original error
+			if rerr == nil {
+				rerr = err
+			}
 		}
 	}()
 

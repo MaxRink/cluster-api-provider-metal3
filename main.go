@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -622,6 +623,22 @@ func setupWebhooks(mgr ctrl.Manager) {
 	}
 }
 
+// versionNumberRegex matches leading digits in a version string.
+// This handles cases like "28+" or "1.28-gke.1" where the version
+// contains non-numeric suffixes.
+var versionNumberRegex = regexp.MustCompile(`^(\d+)`)
+
+// parseVersionNumber extracts the leading numeric portion from a version string.
+// Some cloud providers append suffixes to version numbers (e.g., "28+" on GKE).
+func parseVersionNumber(version string) (int, error) {
+	matches := versionNumberRegex.FindStringSubmatch(version)
+	// matches[0] is the full match, matches[1] is the captured group
+	if matches == nil {
+		return 0, fmt.Errorf("no numeric portion found in version: %s", version)
+	}
+	return strconv.Atoi(matches[1])
+}
+
 func concurrency(c int) controller.Options {
 	return controller.Options{MaxConcurrentReconciles: c}
 }
@@ -645,14 +662,15 @@ func isOutOfServiceTaintSupported(config *rest.Config) (bool, error) {
 		return false, err
 	}
 
-	major, err := strconv.Atoi(k8sVersion.Major)
+	// Parse version numbers, handling cloud provider suffixes like "28+" or "1.28-gke.1"
+	major, err := parseVersionNumber(k8sVersion.Major)
 	if err != nil {
 		setupLog.Error(err, "could not parse k8s server major version", "major version", k8sVersion.Major)
 		return false, err
 	}
-	minor, err := strconv.Atoi(k8sVersion.Minor)
+	minor, err := parseVersionNumber(k8sVersion.Minor)
 	if err != nil {
-		setupLog.Error(err, "could not convert k8s server minor version", "minor version", k8sVersion.Minor)
+		setupLog.Error(err, "could not parse k8s server minor version", "minor version", k8sVersion.Minor)
 		return false, err
 	}
 

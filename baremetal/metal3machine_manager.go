@@ -428,6 +428,10 @@ func (m *MachineManager) Associate(ctx context.Context) error {
 // for the BareMetalHost through Metal3Machine. The UserDataSecretName might already be in a secret with
 // CABPK v0.3.0+, but if it is in a different namespace than the BareMetalHost,
 // then we need to create the secret.
+//
+// If neither DataSecretName nor ConfigRef is defined, UserData remains nil.
+// This is expected when bootstrap data is not yet available (e.g., during early
+// machine lifecycle stages before the bootstrap controller has generated the data).
 func (m *MachineManager) getUserDataSecretName(_ context.Context) {
 	if m.Metal3Machine.Status.UserData != nil {
 		return
@@ -435,6 +439,7 @@ func (m *MachineManager) getUserDataSecretName(_ context.Context) {
 
 	if m.Metal3Machine.Spec.UserData != nil {
 		m.Metal3Machine.Status.UserData = m.Metal3Machine.Spec.UserData
+		return
 	}
 
 	// if datasecretname is set just pass the reference.
@@ -444,12 +449,19 @@ func (m *MachineManager) getUserDataSecretName(_ context.Context) {
 			Namespace: m.Machine.Namespace,
 		}
 		return
-	} else if m.Machine.Spec.Bootstrap.ConfigRef.IsDefined() {
+	}
+
+	if m.Machine.Spec.Bootstrap.ConfigRef.IsDefined() {
 		m.Metal3Machine.Status.UserData = &corev1.SecretReference{
 			Name:      m.Machine.Spec.Bootstrap.ConfigRef.Name,
 			Namespace: m.Machine.Namespace,
 		}
+		return
 	}
+
+	// Neither DataSecretName nor ConfigRef is defined.
+	// UserData remains nil - this is expected when bootstrap data is not yet available.
+	m.Log.V(VerbosityLevelDebug).Info("No bootstrap data source available, UserData will remain nil")
 }
 
 // Delete deletes a metal3 machine and is invoked by the Machine Controller.

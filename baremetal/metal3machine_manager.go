@@ -26,7 +26,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	// comment for go-lint.
@@ -82,9 +81,8 @@ const (
 
 var (
 	// Capm3FastTrack is the variable fetched from the CAPM3_FAST_TRACK environment variable.
-	Capm3FastTrack    = os.Getenv("CAPM3_FAST_TRACK")
-	errNotFound       *NotFoundError
-	associateBMHMutex sync.Mutex
+	Capm3FastTrack = os.Getenv("CAPM3_FAST_TRACK")
+	errNotFound    *NotFoundError
 )
 
 // MachineManagerInterface is an interface for a MachineManager.
@@ -335,11 +333,12 @@ func (m *MachineManager) SetPauseAnnotation(ctx context.Context) error {
 }
 
 // Associate associates a machine and is invoked by the Machine Controller.
+// When multiple Metal3Machines attempt to associate with available BareMetalHosts
+// concurrently, they may select the same host. This is handled safely through
+// Kubernetes optimistic locking: the patch operation will fail with a conflict
+// error if another reconciliation has already claimed the host. The losing
+// reconciliation will retry and select a different available host.
 func (m *MachineManager) Associate(ctx context.Context) error {
-	// Parallel attempts to associate is problematic since the same BMH
-	// could be selected for multiple M3Ms. Therefore we use a mutex lock here.
-	associateBMHMutex.Lock()
-	defer associateBMHMutex.Unlock()
 	m.Log.Info("Associating Metal3Machine with BareMetalHost",
 		LogFieldMachine, m.Machine.Name,
 		LogFieldMetal3Machine, m.Metal3Machine.Name,

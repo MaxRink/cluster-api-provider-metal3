@@ -343,7 +343,7 @@ func initFlags(fs *pflag.FlagSet) {
 	)
 
 	fs.IntVar(&metal3MachineConcurrency, "metal3machine-concurrency", defaultConcurrency,
-		"Number of metal3machines to process simultaneously. WARNING! Currently not safe to set > 1.")
+		"Number of metal3machines to process simultaneously")
 
 	fs.IntVar(&metal3ClusterConcurrency, "metal3cluster-concurrency", defaultConcurrency,
 		"Number of metal3clusters to process simultaneously")

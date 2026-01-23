@@ -110,6 +110,11 @@ func (r *Metal3ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			clusterLog.V(baremetal.VerbosityLevelDebug).Info("Setting NoCloudProvider=true for compatibility")
 		}
 	} else if metal3Cluster.Spec.NoCloudProvider != nil {
+		// Log deprecation warning at INFO level so users are aware
+		clusterLog.Info("DEPRECATION WARNING: Metal3Cluster.Spec.NoCloudProvider is deprecated and will be removed in a future release. Please use CloudProviderEnabled instead.",
+			"noCloudProvider", *metal3Cluster.Spec.NoCloudProvider,
+			"cluster", metal3Cluster.Name,
+			"namespace", metal3Cluster.Namespace)
 		clusterLog.V(baremetal.VerbosityLevelDebug).Info("NoCloudProvider is set (deprecated)",
 			"noCloudProvider", *metal3Cluster.Spec.NoCloudProvider)
 		if *metal3Cluster.Spec.NoCloudProvider {
